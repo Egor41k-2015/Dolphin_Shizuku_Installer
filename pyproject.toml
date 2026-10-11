@@ -1,1 +1,26 @@
+[project]
+name = "adb-installer"
+version = "1.0.0"
+description = "APK Installer via Shizuku/Dhizuku"
+requires-python = ">=3.10"
+dependencies = [
+    "flet>=1.0.4",
+    "flet-shizuku-installer @ file:./flet_shizuku_installer",
+]
 
+[tool.flet]
+org = "com.egor.adbinstaller"
+product = "APK Installer"
+company = "Egor"
+
+[tool.flet.app]
+path = "."
+
+[[tool.flet.android.permission]]
+name = "android.permission.INTERNET"
+
+[[tool.flet.android.permission]]
+name = "android.permission.READ_EXTERNAL_STORAGE"
+
+[[tool.flet.android.permission]]
+name = "android.permission.MANAGE_EXTERNAL_STORAGE"
