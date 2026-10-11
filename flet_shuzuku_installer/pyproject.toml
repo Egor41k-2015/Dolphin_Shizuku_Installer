@@ -8,8 +8,11 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["flet-build"]
-build-backend = "flet_build"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.flet.extension]
-name = "shizuku_installer"
+name = "flet_shizuku_installer"
