@@ -1,1 +1,15 @@
+[project]
+name = "flet-shizuku-installer"
+version = "0.1.0"
+description = "Flet extension for installing APKs via Shizuku/Dhizuku"
+requires-python = ">=3.10"
+dependencies = [
+    "flet>=1.0.4",
+]
 
+[build-system]
+requires = ["flet-build"]
+build-backend = "flet_build"
+
+[tool.flet.extension]
+name = "shizuku_installer"
