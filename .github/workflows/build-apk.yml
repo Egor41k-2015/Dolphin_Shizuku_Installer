@@ -1,1 +1,145 @@
+name: Build Flet APK
 
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'main.py'
+      - 'pyproject.toml'
+      - 'flet_shizuku_installer/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      PYTHONUTF8: 1
+      FLET_CLI_NO_RICH_OUTPUT: 1
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Read version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(grep -E '^version\s*=' pyproject.toml | head -1 | sed -E 's/.*"(.*)".*/\1/')
+          TAG="v$VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Pre-install Flutter SDK
+        run: |
+          if [ ! -d "$HOME/flutter" ]; then
+            git clone --depth 1 --branch stable https://github.com/flutter/flutter.git $HOME/flutter
+            echo "$HOME/flutter/bin" >> $GITHUB_PATH
+            git config --global --add safe.directory "$HOME/flutter"
+          fi
+          export PATH="$HOME/flutter/bin:$PATH"
+          flutter --version
+          flutter config --no-analytics
+
+      - name: Install Flet and local extension
+        run: |
+          python -m pip install --upgrade pip
+          pip install flet==1.0.4 flet-cli
+          pip install -e ./flet_shizuku_installer
+
+      - name: Configure Git
+        run: git config --global --add safe.directory '*'
+
+      - name: Build APK (all architectures)
+        run: |
+          printf 'y\ny\ny\n' | flet build apk --python-version 3.12 --split-per-abi --verbose --no-rich-output
+
+      - name: Collect APK files
+        run: |
+          mkdir -p dist
+          find build -name "app-*-release.apk" -type f -exec cp {} dist/ \;
+          ls -la dist/
+          COUNT=$(ls -1 dist/*.apk 2>/dev/null | wc -l)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "❌ APK не найдены"
+            exit 1
+          fi
+
+      - name: Upload arm64-v8a APK
+        if: hashFiles('dist/app-arm64-v8a-release.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-arm64-v8a-v${{ steps.version.outputs.version }}
+          path: dist/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+
+      - name: Upload armeabi-v7a APK
+        if: hashFiles('dist/app-armeabi-v7a-release.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-armeabi-v7a-v${{ steps.version.outputs.version }}
+          path: dist/app-armeabi-v7a-release.apk
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+
+      - name: Upload x86_64 APK
+        if: hashFiles('dist/app-x86_64-release.apk') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-x86_64-v${{ steps.version.outputs.version }}
+          path: dist/app-x86_64-release.apk
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+
+      - name: Create or update Git tag
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag -f "$TAG"
+            git push origin -f "$TAG"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Release ${{ steps.version.outputs.version }}"
+          body: |
+            ## 📦 APK Installer via Shizuku/Dhizuku
+
+            | Файл | Для чего |
+            |------|----------|
+            | `app-arm64-v8a-release.apk` | Современные телефоны |
+            | `app-armeabi-v7a-release.apk` | Старые 32-битные |
+            | `app-x86_64-release.apk` | Эмуляторы |
+          files: dist/*.apk
+          fail_on_unmatched_files: true
+          make_latest: true
+          overwrite_files: true
