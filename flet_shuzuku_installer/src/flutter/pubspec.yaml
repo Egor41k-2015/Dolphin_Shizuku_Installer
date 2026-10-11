@@ -1,1 +1,14 @@
+name: flet_shizuku_installer
+description: Flet extension for Shizuku/Dhizuku APK installs
+version: 0.1.0
+publish_to: 'none'
 
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flet: ^0.25.0
+  shizuku_apk_installer: ^1.3.0
